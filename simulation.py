@@ -34,8 +34,27 @@ WIDTH, HEIGHT = 1280, 720
 init()
 
 class Game:
-    def __init__(self):
+    def __init__(self, p0, p1, p2, p3):
+        #pn True is AI, False is human player
         self.board = Board()
+        self.players = [p0, p1, p2, p3]
+        self.turn = 0
+
+    def doTurn(self):
+        if self.players[self.turn]:
+            #Get actions from AI and do them
+            self.endTurn()
+            
+        else:
+            #Get player turn actions from input
+            while True:
+                inp = input()
+                if inp == "End":
+                    endTurn()
+                    break
+
+    def endTurn(self):
+        self.turn += 1
 
     def endGame(self, winner):
         if winner == -1:
@@ -58,6 +77,7 @@ class Board:
                       Hex(3/r2b2, 0, 1, "Grain"), Hex(3/r2b2, 0, -1, "Wool"), Hex(3/r2b2, r2b2, 0.5, "Wool"), Hex(3/r2b2, r2b2, -0.5, "Brick"), Hex(3/r2b2, -r2b2, 0.5, "Lumber"), Hex(3/r2b2, -r2b2, -0.5, "Grain"),
                       Hex(4, 1, 0, "Ore"), Hex(4, -1, 0, "Grain"), Hex(4, 0.5, r2b2, "Wool"), Hex(4, -0.5, r2b2, "Brick"), Hex(4, 0.5, -r2b2, "Lumber"), Hex(4, -0.5, -r2b2, "Ore")]
         
+        self.vertices = []
 
     def display(self, screen):
         for tile in self.tiles:
@@ -74,7 +94,8 @@ class Hex:
         self.real = real
         self.imaginary = imaginary
         self.resource = resource
-        colours = {"Brick":(255, 0, 0), "Lumber":(150, 75, 0), "Ore": (150, 150, 150), "Grain": (255, 255, 0), "Wool": (255, 255, 255), "Null":(0, 0, 0)}
+        self.hasRobber = self.resource == "Null"
+        colours = {"Brick":(255, 0, 0), "Lumber":(150, 75, 0), "Ore": (150, 150, 150), "Grain": (255, 255, 0), "Wool": (255, 255, 255), "Null":(100, 100, 30)}
         self.col = colours[self.resource]
         self.x = Hex.boardCenter[0] + Hex.radius*distance*real*(3**0.5)/2
         self.y = Hex.boardCenter[1] + Hex.radius*distance*imaginary*(3**0.5)/2
@@ -87,6 +108,8 @@ class Hex:
         (self.x, self.y + Hex.radius),
         (self.x - Hex.radius * 3 ** 0.5 / 2, self.y + Hex.radius / 2),
         (self.x - Hex.radius * 3 ** 0.5 / 2, self.y - Hex.radius / 2)], 0)
+        if self.hasRobber:
+            draw.circle(screen, (0, 0, 0), (self.x, self.y), 15, 0)
 
 
 
@@ -96,6 +119,7 @@ class Player:
         self.victory = 0
         self.ID = ID
         self.game = game
+        self.cards = []
 
     def addVictory(self):
         self.victory += 1
@@ -115,3 +139,15 @@ class DevelopmentCard:
             pass
         elif card == "Library":
             player.addVictory()
+
+class Vertex:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.bridge1 = None
+        self.bridge2 = None #Bridge is labelled with 0, 1, 2, 3 depending on player
+        self.bridge3 = None #always None if it is an outer vertex
+        self.town = None #the town here
+        self.city = None
+
+
