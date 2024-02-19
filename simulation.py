@@ -54,9 +54,9 @@ class Board:
     def __init__(self):
         r2b2 = 3**0.5/2
         self.tiles = [Hex(0, 0, 0, "Null"),
-                      Hex(2, 1, 0, "Brick"), Hex(2, -1, 0, "Brick"), Hex(2, 0.5, r2b2, "Brick"), Hex(2, -0.5, r2b2, "Brick"), Hex(2, 0.5, -r2b2, "Brick"), Hex(2, -0.5, -r2b2, "Brick"),
-                      Hex(3/r2b2, 0, 1, "Brick"), Hex(3/r2b2, 0, -1, "Brick"), Hex(3/r2b2, r2b2, 0.5, "Brick"), Hex(3/r2b2, r2b2, -0.5, "Brick"), Hex(3/r2b2, -r2b2, 0.5, "Brick"), Hex(3/r2b2, -r2b2, -0.5, "Brick"),
-                      Hex(4, 1, 0, "Brick"), Hex(4, -1, 0, "Brick"), Hex(4, 0.5, r2b2, "Brick"), Hex(4, -0.5, r2b2, "Brick"), Hex(4, 0.5, -r2b2, "Brick"), Hex(4, -0.5, -r2b2, "Brick")]
+                      Hex(2, 1, 0, "Lumber"), Hex(2, -1, 0, "Lumber"), Hex(2, 0.5, r2b2, "Grain"), Hex(2, -0.5, r2b2, "Ore"), Hex(2, 0.5, -r2b2, "Wool"), Hex(2, -0.5, -r2b2, "Brick"),
+                      Hex(3/r2b2, 0, 1, "Grain"), Hex(3/r2b2, 0, -1, "Wool"), Hex(3/r2b2, r2b2, 0.5, "Wool"), Hex(3/r2b2, r2b2, -0.5, "Brick"), Hex(3/r2b2, -r2b2, 0.5, "Lumber"), Hex(3/r2b2, -r2b2, -0.5, "Grain"),
+                      Hex(4, 1, 0, "Ore"), Hex(4, -1, 0, "Grain"), Hex(4, 0.5, r2b2, "Wool"), Hex(4, -0.5, r2b2, "Brick"), Hex(4, 0.5, -r2b2, "Lumber"), Hex(4, -0.5, -r2b2, "Ore")]
         
 
     def display(self, screen):
@@ -74,7 +74,7 @@ class Hex:
         self.real = real
         self.imaginary = imaginary
         self.resource = resource
-        colours = {"Brick":(255, 0, 0), "Null":(150, 150, 150)}
+        colours = {"Brick":(255, 0, 0), "Lumber":(150, 75, 0), "Ore": (150, 150, 150), "Grain": (255, 255, 0), "Wool": (255, 255, 255), "Null":(0, 0, 0)}
         self.col = colours[self.resource]
         self.x = Hex.boardCenter[0] + Hex.radius*distance*real*(3**0.5)/2
         self.y = Hex.boardCenter[1] + Hex.radius*distance*imaginary*(3**0.5)/2
@@ -86,7 +86,7 @@ class Hex:
         (self.x + Hex.radius * 3 ** 0.5 / 2, self.y + Hex.radius / 2),
         (self.x, self.y + Hex.radius),
         (self.x - Hex.radius * 3 ** 0.5 / 2, self.y + Hex.radius / 2),
-        (self.x - Hex.radius * 3 ** 0.5 / 2, self.y - Hex.radius / 2)], 2)
+        (self.x - Hex.radius * 3 ** 0.5 / 2, self.y - Hex.radius / 2)], 0)
 
 
 
