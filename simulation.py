@@ -1,4 +1,5 @@
 from pygame import *
+from random import *
 """
 Classes:
 game (includes board state and the player states, current turn, who is AI and who isn't, delay for the AI turns)
@@ -37,21 +38,21 @@ class Game:
     def __init__(self, p0, p1, p2, p3):
         #pn True is AI, False is human player
         self.board = Board()
-        self.players = [p0, p1, p2, p3]
+        self.players = [Player(0, p0, self), Player(1, p1, self), Player(2, p2, self), Player(3, p3, self)]
         self.turn = 0
 
     def doTurn(self):
-        if self.players[self.turn]:
-            #Get actions from AI and do them
-            self.endTurn()
-            
+        action = self.players[self.turn].decideAction()
+        if action == "Build City":
+            self.players[self.turn].buildCity()
+        elif action == "Build Settlement":
+            self.players[self.turn].buildSettlement()
         else:
-            #Get player turn actions from input
-            while True:
-                inp = input()
-                if inp == "End":
-                    endTurn()
-                    break
+            self.endTurn()
+        for player in self.players:
+            if player.victory >= 10:
+                self.endGame(player)
+        self.doTurn()
 
     def endTurn(self):
         self.turn += 1
@@ -61,6 +62,7 @@ class Game:
             print("Invalid winner")
         else:
             print(winner)
+        del self
 
     def display(self, screen):
         self.board.display(screen)
@@ -114,19 +116,83 @@ class Hex:
 
 
 class Player:
-    def __init__(self, ID, game):
+    def __init__(self, ID, isAI, game):
         self.resources = {"Brick":0, "Lumber":0, "Ore":0, "Grain":0, "Wool":0}
         self.victory = 0
         self.ID = ID
         self.game = game
         self.cards = []
+        self.isAI = isAI
 
     def addVictory(self):
         self.victory += 1
         if self.victory >= 10:
             self.game.endGame(self.ID)
 
+    def rollDice(self):
+        dice1 = randint(1, 6)
+        dice2 = randint(1, 6)
+        roll = dice1 + dice2
+        return roll
 
+    def changeResources(brick, lumber, ore, grain, wool):
+        self.resources["Brick"] += brick
+        self.resources["Lumber"] += lumber
+        self.resources["Ore"] += ore
+        self.resources["Grain"] += grain
+        self.reosurces["Wool"] += wool
+
+    def moveRobber(self):
+        if self.isAI:
+            pass
+        else:
+            inp = input("Enter the tile to move the robber to: ")
+            return int(inp)
+
+    def decideAction(self):
+        actions = {"1":"Build City", "2":"Build Settlement"}
+        if self.isAI:
+            pass
+        else:
+            print("1: Build City")
+            inp = input("Enter the action you would like to take: ")
+            return actions[int(inp)]
+
+    def buildCity(self):
+        if self.isAI:
+            pass
+        else:
+            pass
+
+    def buildSettlement(self):
+        if self.isAI:
+            pass
+        else:
+            pass
+
+    def buildBridge(self):
+        if self.isAI:
+            pass
+        else:
+            pass
+
+    def tradeRequest(self):
+        if self.isAI:
+            pass
+        else:
+            pass
+
+
+
+
+"""
+Turn:
+roll dice and get production
+built settlements
+build cities
+buy development card
+play development cards (cant be one you just bought cept for victory cards)
+"""
 
 class DevelopmentCard:
     def __init__(self, card):
