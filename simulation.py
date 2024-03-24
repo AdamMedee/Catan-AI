@@ -1,5 +1,6 @@
 from pygame import *
 from random import *
+from math import cos, sin, pi
 """
 Classes:
 game (includes board state and the player states, current turn, who is AI and who isn't, delay for the AI turns)
@@ -34,12 +35,18 @@ WIDTH, HEIGHT = 1280, 720
 
 init()
 
+
+
+
+#One full Catan simulation from start until someone wins
 class Game:
-    def __init__(self, p0, p1, p2, p3):
+    def __init__(self, p0, p1, p2, p3, show):
         #pn True is AI, False is human player
+        #The ID is which team you are on (team 0, 1, 2, 3)
         self.board = Board()
         self.players = [Player(0, p0, self), Player(1, p1, self), Player(2, p2, self), Player(3, p3, self)]
         self.turn = 0
+        self.show = show
 
     def doTurn(self):
         action = self.players[self.turn].decideAction()
@@ -52,7 +59,6 @@ class Game:
         for player in self.players:
             if player.victory >= 10:
                 self.endGame(player)
-        self.doTurn()
 
     def endTurn(self):
         self.turn += 1
@@ -65,7 +71,8 @@ class Game:
         del self
 
     def display(self, screen):
-        self.board.display(screen)
+        if self.show:
+            self.board.display(screen)
 
 
 
@@ -73,17 +80,71 @@ class Board:
     center = (WIDTH/2, HEIGHT/2)
         
     def __init__(self):
-        r2b2 = 3**0.5/2
-        self.tiles = [Hex(0, 0, 0, "Null"),
-                      Hex(2, 1, 0, "Lumber"), Hex(2, -1, 0, "Lumber"), Hex(2, 0.5, r2b2, "Grain"), Hex(2, -0.5, r2b2, "Ore"), Hex(2, 0.5, -r2b2, "Wool"), Hex(2, -0.5, -r2b2, "Brick"),
-                      Hex(3/r2b2, 0, 1, "Grain"), Hex(3/r2b2, 0, -1, "Wool"), Hex(3/r2b2, r2b2, 0.5, "Wool"), Hex(3/r2b2, r2b2, -0.5, "Brick"), Hex(3/r2b2, -r2b2, 0.5, "Lumber"), Hex(3/r2b2, -r2b2, -0.5, "Grain"),
-                      Hex(4, 1, 0, "Ore"), Hex(4, -1, 0, "Grain"), Hex(4, 0.5, r2b2, "Wool"), Hex(4, -0.5, r2b2, "Brick"), Hex(4, 0.5, -r2b2, "Lumber"), Hex(4, -0.5, -r2b2, "Ore")]
-        
+        r3b2 = 3**0.5/2
+
         self.vertices = []
+        for i in range(6):
+            self.vertices.append(Vertex(Board.center[0] + 50*cos(pi*i/3+pi/6), Board.center[1] + 50*sin(pi*i/3 + pi/6)))
+        for i in range(6):
+            hexCenterX = Board.center[0] + (3)*50*cos(pi*i/3+pi/6)
+            hexCenterY = Board.center[1] + (3)*50*sin(pi*i/3+pi/6)
+            for j in range(6):
+                self.vertices.append(Vertex(hexCenterX + 50*cos(pi*j/3+pi/6), hexCenterY + 50*sin(pi*j/3+pi/6)))
+        for i in range(6):
+            hexCenterX = Board.center[0] + 4*r3b2*50*cos(i*pi/3)
+            hexCenterY = Board.center[1] + 4*r3b2*50*sin(i*pi/3)
+            self.vertices.append(Vertex(hexCenterX + 50*cos(i*pi/3+pi/6), hexCenterY + 50*sin(i*pi/3 + pi/6)))
+            self.vertices.append(Vertex(hexCenterX + 50*cos(i*pi/3-pi/6), hexCenterY + 50*sin(i*pi/3 - pi/6)))
+
+        self.bridges = []
+        for i in range(len(self.vertices)):
+            for j in range(i):
+                vertex1 = self.vertices[i]
+                vertex2 = self.vertices[j]
+                dist = ((vertex2.x - vertex1.x)**2 + (vertex2.y - vertex1.y)**2)**0.5
+                if abs(dist - 50) < 1:
+                    self.bridges.append(Bridge(vertex1, vertex2))
+                
+
+        self.tiles = [Hex(0, 0, 0, "Null"),
+                      Hex(2, 1, 0, "Lumber"), Hex(2, -1, 0, "Lumber"), Hex(2, 0.5, r3b2, "Grain"), Hex(2, -0.5, r3b2, "Ore"), Hex(2, 0.5, -r3b2, "Wool"), Hex(2, -0.5, -r3b2, "Brick"),
+                      Hex(3/r3b2, 0, 1, "Grain"), Hex(3/r3b2, 0, -1, "Wool"), Hex(3/r3b2, r3b2, 0.5, "Wool"), Hex(3/r3b2, r3b2, -0.5, "Brick"), Hex(3/r3b2, -r3b2, 0.5, "Lumber"), Hex(3/r3b2, -r3b2, -0.5, "Grain"),
+                      Hex(4, 1, 0, "Ore"), Hex(4, -1, 0, "Grain"), Hex(4, 0.5, r3b2, "Wool"), Hex(4, -0.5, r3b2, "Brick"), Hex(4, 0.5, -r3b2, "Lumber"), Hex(4, -0.5, -r3b2, "Ore")]
+        
+        for tile in self.tiles:
+            for vertex in self.vertices:
+                dist = ((vertex.x-tile.x)**2 + (vertex.y-tile.y)**2)**0.5
+                if abs(dist - 50) < 1:
+                    tile.vertices.append(vertex)
+            print(len(tile.vertices))
+
+
+    def placeCity(self, team, location):
+        #Check if settlement of same colour is there
+        pass
+
+    def placeSettlement(self, team, location):
+        #Check if empty and same colour bridge is connected, and no neighbouring settlements/cities at all
+        pass
+
+    def placeBridge(self, team, location1, location2):
+        #Check if empty and connected to another bridge of same colour
+        pass
+            
 
     def display(self, screen):
         for tile in self.tiles:
-            tile.display(screen)
+            tile.update(screen)
+            
+
+        for vertex in self.vertices:
+            vertex.update(screen)
+
+            
+
+        for bridge in self.bridges:
+            bridge.update(screen)
+
 
 
 
@@ -101,8 +162,9 @@ class Hex:
         self.col = colours[self.resource]
         self.x = Hex.boardCenter[0] + Hex.radius*distance*real*(3**0.5)/2
         self.y = Hex.boardCenter[1] + Hex.radius*distance*imaginary*(3**0.5)/2
+        self.vertices = []
 
-    def display(self, screen):
+    def update(self, screen):
         draw.polygon(screen, self.col, [
         (self.x, self.y - Hex.radius),
         (self.x + Hex.radius * 3 ** 0.5 / 2, self.y - Hex.radius / 2),
@@ -142,13 +204,10 @@ class Player:
         self.resources["Grain"] += grain
         self.reosurces["Wool"] += wool
 
-    def moveRobber(self):
-        if self.isAI:
-            pass
-        else:
-            inp = input("Enter the tile to move the robber to: ")
-            return int(inp)
+    def checkCost(brick, lumber, ore, grain, wool):
+        return self.resources["Brick"] >= brick and self.resources["Lumber"] >= lumber and self.resources["Ore"] >= ore and self.resources["Grain"] >= grain and self.resources["Wool"] >= wool
 
+    # These functions return true if succesful/possible, otherwise returns false
     def decideAction(self):
         actions = {"1":"Build City", "2":"Build Settlement"}
         if self.isAI:
@@ -158,11 +217,28 @@ class Player:
             inp = input("Enter the action you would like to take: ")
             return actions[int(inp)]
 
-    def buildCity(self):
+    def moveRobber(self):
         if self.isAI:
             pass
         else:
+            inp = input("Enter the tile to move the robber to: ")
+            return int(inp)
+
+
+    
+    def buildCity(self):
+        if not checkCost(0, 0, 3, 2, 0):
+            return False
+        if self.isAI:
             pass
+        else:
+            inp = input("Enter where you would like to place the city: ")
+            try:
+                inp = int(inp)
+            except:
+                return False
+            return Player.game.Board.buildCity(self.ID, inp)
+            
 
     def buildSettlement(self):
         if self.isAI:
@@ -207,6 +283,7 @@ class DevelopmentCard:
             player.addVictory()
 
 class Vertex:
+    
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -215,5 +292,19 @@ class Vertex:
         self.bridge3 = None #always None if it is an outer vertex
         self.town = None #the town here
         self.city = None
+
+    def update(self, screen):
+        draw.circle(screen, (255, 255, 255), (self.x, self.y), 10, 0)
+        if self.town != None:
+            pass
+
+class Bridge:
+    def __init__(self, v1, v2):
+        self.v1 = v1
+        self.v2 = v2
+
+    def update(self, screen):
+        draw.line(screen, (255, 255, 255), (self.v1.x, self.v1.y), (self.v2.x, self.v2.y), 3)
+    
 
 

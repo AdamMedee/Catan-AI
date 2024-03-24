@@ -6,7 +6,7 @@ from simulation import *
 def main():
     running = True
 
-    g = Game(False, False, False, False)
+    g = Game(False, False, False, False, True)
 
     screen = display.set_mode((WIDTH, HEIGHT))
 
