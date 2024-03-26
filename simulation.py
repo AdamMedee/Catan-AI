@@ -35,7 +35,7 @@ WIDTH, HEIGHT = 1280, 720
 
 init()
 
-
+teamColours = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
 
 
 #One full Catan simulation from start until someone wins
@@ -49,19 +49,88 @@ class Game:
         self.show = show
 
     def doTurn(self):
-        action = self.players[self.turn].decideAction()
-        if action == "Build City":
-            self.players[self.turn].buildCity()
-        elif action == "Build Settlement":
-            self.players[self.turn].buildSettlement()
+        roll = self.players[self.turn].rollDice()
+
+        if roll == 7:
+            self.players[self.turn].moveRobber()
         else:
-            self.endTurn()
+            self.resourceProduction(roll)
+
+        #Proccess the user action
+        action = self.players[self.turn].decideAction()
+        for i in range(5): #Maximum of 5 actions per turn
+            if action == "Build City":
+                if self.players[self.turn].buildCity():
+                    break
+                else:
+                    continue
+            elif action == "Build Settlement":
+                if self.players[self.turn].buildSettlement():
+                    break
+                else:
+                    continue
+            elif action == "Build Bridge":
+                if self.players[self.turn].buildBridge():
+                    break
+                else:
+                    continue
+            elif action == "Buy Development Card":
+                if self.players[self.turn].buyDevelopmentCard():
+                    break
+                else:
+                    continue
+            elif action == "Trade":
+                if self.players[self.turn].tradeRequest():
+                    break
+                else:
+                    continue
+            elif action == "Use Knight Card":
+                if self.players[self.turn].useKnightCard():
+                    break
+                else:
+                    continue
+            elif action == "Use Road Building Card":
+                if self.players[self.turn].useRoadBuildingCard():
+                    break
+                else:
+                    continue
+            elif action == "Use Year Of Plenty Card":
+                if self.players[self.turn].useYearOfPlentyCard():
+                    break
+                else:
+                    continue
+            elif action == "Use Monopoly Card":
+                if self.players[self.turn].useMonopolyCard():
+                    break
+                else:
+                    continue
+            elif action == "Use Victory Point Card":
+                if self.players[self.turn].useVictoryPointCard():
+                    break
+                else:
+                    continue
+            else:
+                self.endTurn()
+            
         for player in self.players:
             if player.victory >= 10:
                 self.endGame(player)
 
     def endTurn(self):
-        self.turn += 1
+        self.turn = (self.turn+1)%4
+
+    def resourceProduction(self, rollValue):
+        for tile in self.board.tiles:
+            if tile.dice == rollValue:
+                for vertex in tile.vertices:
+                    resources = {"Brick":0, "Lumber":0, "Ore":0, "Grain":0, "Wool":0}
+                    if vertex.settlement != None:
+                        resources[tile.resource] = 1
+                    elif vertex.city != None:
+                        resources[tile.resource] = 2
+                    else:
+                        continue
+                    self.players[vertex].changeResources(resources["Brick"], resources["Lumber"], resources["Ore"], resources["Grain"], resources["Wool"])
 
     def endGame(self, winner):
         if winner == -1:
@@ -69,6 +138,52 @@ class Game:
         else:
             print(winner)
         del self
+
+    def placeCity(self, team, location):
+        #Check if settlement of same colour is there
+        if self.board.vertices[location].settlement == team:
+            self.board.vertices[location].placeCity(team)
+            return True
+        return False
+
+    def placeSettlement(self, team, location):
+        #Check if empty and same colour bridge is connected, and no neighbouring settlements/cities at all
+        if self.board.vertices[location].settlement != None:
+           return False
+        for vertex in self.board.vertices[location].adjacentNodes:
+            if vertex.settlement != None or vertex.city != None:
+                return False
+        flag = False
+        for bridge in self.board.bridges:
+            if self.board.vertices[location] in [bridge.v1, bridge.v2]:
+                if bridge.bridge == team:
+                    flag = True
+        self.board.vertices[location].placeSettlement(team)
+        return True
+            
+        
+
+    def placeBridge(self, team, location1, location2):
+        #Check if empty and connected to another bridge of same colour
+        pass
+
+    def moveRobber(self, team, location):
+        #Check if robber location is valid
+        if 0 <= location <= 19:
+            self.board.tiles[self.board.currentRobber].setRobber(False)
+            self.board.tiles[location].setRobber(True)
+            options = []
+            for vertex in self.board.tiles[location].vertices:
+                if vertex.settlement != team and vertex.city != team:
+                    
+                    options.append(vertex)
+                    
+                    
+            return True
+        return False
+
+    def totalResources(self, team):
+        return self.players[team].resources["Brick"] + self.players[team].resources["Lumber"] + self.players[team].resources["Ore"] + self.players[team].resources["Wool"] + self.players[team].resources["Grain"]
 
     def display(self, screen):
         if self.show:
@@ -104,43 +219,33 @@ class Board:
                 dist = ((vertex2.x - vertex1.x)**2 + (vertex2.y - vertex1.y)**2)**0.5
                 if abs(dist - 50) < 1:
                     self.bridges.append(Bridge(vertex1, vertex2))
+                    vertex1.adjacentNodes.append(vertex2)
+                    vertex2.adjacentNodes.append(vertex1)
                 
 
-        self.tiles = [Hex(0, 0, 0, "Null"),
-                      Hex(2, 1, 0, "Lumber"), Hex(2, -1, 0, "Lumber"), Hex(2, 0.5, r3b2, "Grain"), Hex(2, -0.5, r3b2, "Ore"), Hex(2, 0.5, -r3b2, "Wool"), Hex(2, -0.5, -r3b2, "Brick"),
-                      Hex(3/r3b2, 0, 1, "Grain"), Hex(3/r3b2, 0, -1, "Wool"), Hex(3/r3b2, r3b2, 0.5, "Wool"), Hex(3/r3b2, r3b2, -0.5, "Brick"), Hex(3/r3b2, -r3b2, 0.5, "Lumber"), Hex(3/r3b2, -r3b2, -0.5, "Grain"),
-                      Hex(4, 1, 0, "Ore"), Hex(4, -1, 0, "Grain"), Hex(4, 0.5, r3b2, "Wool"), Hex(4, -0.5, r3b2, "Brick"), Hex(4, 0.5, -r3b2, "Lumber"), Hex(4, -0.5, -r3b2, "Ore")]
-        
+        self.tiles = [Hex(0, 0, 0, "Null", -1),
+                      Hex(2, 1, 0, "Lumber", 3), Hex(2, -1, 0, "Lumber", 11), Hex(2, 0.5, r3b2, "Grain", 4), Hex(2, -0.5, r3b2, "Ore", 3), Hex(2, 0.5, -r3b2, "Wool", 4), Hex(2, -0.5, -r3b2, "Brick", 6),
+                      Hex(3/r3b2, 0, 1, "Grain", 6), Hex(3/r3b2, 0, -1, "Wool", 2), Hex(3/r3b2, r3b2, 0.5, "Wool", 5), Hex(3/r3b2, r3b2, -0.5, "Brick", 10), Hex(3/r3b2, -r3b2, 0.5, "Lumber", 8), Hex(3/r3b2, -r3b2, -0.5, "Grain", 12),
+                      Hex(4, 1, 0, "Ore", 8), Hex(4, -1, 0, "Grain", 9), Hex(4, 0.5, r3b2, "Wool", 11), Hex(4, -0.5, r3b2, "Brick", 5), Hex(4, 0.5, -r3b2, "Lumber", 9), Hex(4, -0.5, -r3b2, "Ore", 10)]
+
+        self.currentRobber = 0
+
         for tile in self.tiles:
             for vertex in self.vertices:
                 dist = ((vertex.x-tile.x)**2 + (vertex.y-tile.y)**2)**0.5
                 if abs(dist - 50) < 1:
                     tile.vertices.append(vertex)
-            print(len(tile.vertices))
 
 
-    def placeCity(self, team, location):
-        #Check if settlement of same colour is there
-        pass
 
-    def placeSettlement(self, team, location):
-        #Check if empty and same colour bridge is connected, and no neighbouring settlements/cities at all
-        pass
-
-    def placeBridge(self, team, location1, location2):
-        #Check if empty and connected to another bridge of same colour
-        pass
             
 
     def display(self, screen):
         for tile in self.tiles:
             tile.update(screen)
-            
-
+    
         for vertex in self.vertices:
             vertex.update(screen)
-
-            
 
         for bridge in self.bridges:
             bridge.update(screen)
@@ -152,11 +257,12 @@ class Hex:
     radius = 50
     boardCenter = Board.center
     
-    def __init__(self, distance, real, imaginary, resource):
+    def __init__(self, distance, real, imaginary, resource, dice):
         self.distance = distance
         self.real = real
         self.imaginary = imaginary
         self.resource = resource
+        self.dice = dice
         self.hasRobber = self.resource == "Null"
         colours = {"Brick":(255, 0, 0), "Lumber":(150, 75, 0), "Ore": (150, 150, 150), "Grain": (255, 255, 0), "Wool": (255, 255, 255), "Null":(100, 100, 30)}
         self.col = colours[self.resource]
@@ -174,6 +280,9 @@ class Hex:
         (self.x - Hex.radius * 3 ** 0.5 / 2, self.y - Hex.radius / 2)], 0)
         if self.hasRobber:
             draw.circle(screen, (0, 0, 0), (self.x, self.y), 15, 0)
+
+    def setRobber(self, val):
+        self.hasRobber = val
 
 
 
@@ -198,23 +307,36 @@ class Player:
         return roll
 
     def changeResources(brick, lumber, ore, grain, wool):
+        if self.checkCost(brick, lumber, ore, grain, wool):
+            return False
         self.resources["Brick"] += brick
         self.resources["Lumber"] += lumber
         self.resources["Ore"] += ore
         self.resources["Grain"] += grain
         self.reosurces["Wool"] += wool
+        return True
 
     def checkCost(brick, lumber, ore, grain, wool):
         return self.resources["Brick"] >= brick and self.resources["Lumber"] >= lumber and self.resources["Ore"] >= ore and self.resources["Grain"] >= grain and self.resources["Wool"] >= wool
 
     # These functions return true if succesful/possible, otherwise returns false
     def decideAction(self):
-        actions = {"1":"Build City", "2":"Build Settlement"}
+        actions = {1:"Build Settlement", 2:"Build City", 3:"Build Bridge", 4:"Buy Development Card", 5:"Trade", 6:"Use Knight Card", 7:"Use Road Building Card", 8:"Use Year of Plenty Card", 9:"Use Monopoly Card", 10:"Use Victory Point Card",  11:"End Turn"}
         if self.isAI:
             pass
+    
         else:
-            print("1: Build City")
-            inp = input("Enter the action you would like to take: ")
+            for i in range(1, 12):
+                print(i, ":", actions[i])
+            while True:
+                try:
+                    inp = int(input("Enter the action you would like to take: "))
+                    if inp < 1 or inp > 11:
+                        raise
+                    break
+                except:
+                    pass
+
             return actions[int(inp)]
 
     def moveRobber(self):
@@ -222,31 +344,59 @@ class Player:
             pass
         else:
             inp = input("Enter the tile to move the robber to: ")
-            return int(inp)
+            try:
+                inp = int(inp)
+            except:
+                return False
+            return self.game.moveRobber(self.ID, inp)
 
 
     
     def buildCity(self):
-        if not checkCost(0, 0, 3, 2, 0):
+        if not changeResources(0, 0, -3, -2, 0):
             return False
+        
         if self.isAI:
-            pass
+            #For node in output, see if we can build a city there
+            #If so, return true
+            return False
         else:
             inp = input("Enter where you would like to place the city: ")
             try:
                 inp = int(inp)
             except:
                 return False
-            return Player.game.Board.buildCity(self.ID, inp)
+            return self.game.placeCity(self.ID, inp)
             
 
     def buildSettlement(self):
+        if not changeResources(-1, -1, 0, -1, -1):
+            print("Not enough resources for a settlement")
         if self.isAI:
-            pass
+            return False
         else:
-            pass
+            inp = input("Enter where you would like to place the settlement: ")
+            try:
+                inp = int(inp)
+            except:
+                return False
+            return self.game.placeSettlement(self.ID, inp)
+            
 
     def buildBridge(self):
+        if not changeResources(-1, -1, 0, -1, -1):
+            print("Not enough resources for a bridge")
+        if self.isAI:
+            return False
+        else:
+            inp = input("Enter where you would like to place the bridge (For example: 1 2): ")
+            try:
+                inp = int(inp)
+            except:
+                return False
+            return self.game.placeBridge(self.ID, inp)
+
+    def buyDevelopmentCard(self):
         if self.isAI:
             pass
         else:
@@ -258,7 +408,32 @@ class Player:
         else:
             pass
 
+    def useKnightCard(self):
+        if self.isAI:
+            pass
+        else:
+            pass
 
+    def useRoadBuildingCard(self):
+        if self.isAI:
+            pass
+        else:
+            pass
+
+    def useYearOfPlentyCard(self):
+        if self.isAI:
+            pass
+        else:
+            pass
+
+    def useMonopolyCard(self):
+        if self.isAI:
+            pass
+        else:
+            pass
+
+    def useVictoryPointCard(self):
+        self.addVictory()
 
 
 """
@@ -287,21 +462,31 @@ class Vertex:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.bridge1 = None
-        self.bridge2 = None #Bridge is labelled with 0, 1, 2, 3 depending on player
-        self.bridge3 = None #always None if it is an outer vertex
-        self.town = None #the town here
+        self.adjacentNodes = [] #Which nodes are next to it
+        self.settlement = None #the team here, None if no team
         self.city = None
 
     def update(self, screen):
         draw.circle(screen, (255, 255, 255), (self.x, self.y), 10, 0)
-        if self.town != None:
+        if self.settlement != None:
             pass
+
+
+    def placeSettlement(self, team):
+        self.settlement = team
+
+    def placeCity(self, team):
+        self.settlement = None
+        self.city = team
 
 class Bridge:
     def __init__(self, v1, v2):
         self.v1 = v1
         self.v2 = v2
+        self.bridge = None #Which team here, None if empty
+
+    def placeBridge(self, team):
+        self.bridge = team
 
     def update(self, screen):
         draw.line(screen, (255, 255, 255), (self.v1.x, self.v1.y), (self.v2.x, self.v2.y), 3)
