@@ -1,35 +1,62 @@
-from torch import *
-import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class Agent:
-    def __init__(self):
-        #initialize the agent
-        self.games = 0
+import random as rnd
+from scipy import special
+
+class AI_Agent(nn.Module):
     
-    #get the current board state
-    #takes in a list of 1080 elements, each element is a list of 5 values that are either 0 or 1
-    #returns a list of 54 numbers, and each value in the list is either 0 or 1 indicating hexes that
-    #settlements/cities can be built on
-    def get_state(self, board_state):
-        # Convert the input board state to a numpy array for easier manipulation
-        board_state_np = np.array(board_state)
+    NUM_HIDDEN_LAYERS = 2 # Minimum of 1 hidden layer, otherwise change init
+    NUM_HIDDEN_LAYER_NEURONS = 64 #for the hidden layers
+    NUM_OUTPUT_LAYER_NEURONS = 10 #placeholder
+    
+    MUTATION_RATE = 0.1 #probability that a parameter will be mutated in
+    MUTATION_PERCENT = 0.1 #10% chance to mutate a gene in each generation
+    
+    def __init__(self, board_state):
+        super().__init__() #creates an instance
+        self.layers = nn.ModuleList() #makes an empty list containing the input, hidden, and output layers
+        self.layers.append(nn.Linear( board_state + 1, AI_Agent.NUM_HIDDEN_LAYER_NEURONS, bias=False)) #creates input layer
         
-        #array of 54 numbers
-        buildable = []
-        #iterate over every element in the list given
-        i = 0
-        curr_element = 0
-        while i < 54: #the total vetrices on the board
-            j = 0
-            value = 0 #1 or 0
-            while j < 20: #
-                 #do somethin with current element in the board state list
-                 curr_element += 1
-            buildable.append(value)
+        #creates the hidden layers
+        for i in range(AI_Agent.NUM_HIDDEN_LAYERS - 1): 
+            self.layers.append(nn.Linear(AI_Agent.NUM_HIDDEN_LAYER_NEURONS, AI_Agent.NUM_HIDDEN_LAYER_NEURONS, bias=False))
             
-        return buildable #return the list of 54 numbers
+        # Output layer corresponds to speed and angular velocity
+        self.layers.append(nn.Linear(AI_Agent.NUM_HIDDEN_LAYER_NEURONS, AI_Agent.NUM_OUTPUT_LAYER_NEURONS, False)) 
+        #Number of output nodes should be x, 200 is placeholder
+
+        for layer in self.layers:
+            nn.init.constant_(layer.weight, rnd.randrange(0,1)) #gives each weight a starting value between 0 and 1
+
+        self.eval() #stops the training
+
+
+    #the output layer generation
+    def forward(self, input): #original def forward(self, x, viewDistance)
+        """ Feed input into the neural network and obtain movement information as output """
+        x = torch.FloatTensor(input) #since all values between 0 and 1, no need for normalization
+        
+        with torch.no_grad():
+            for i in range(AI_Agent.NUM_HIDDEN_LAYERS):
+                x = F.relu(self.layers[i](x))
+            x = self.layers[-1](x)
+        
+        return special.expit(x).tolist()
     
-    def get_action(self): 
-        pass
+    #generate values random values to give to each bridge
+    def mutation(self):
+        #iterate through each layer in the network
+        for layer in self.layers:
+            #get all the neurons in the current layer
+            weights = layer.weight.data
+            
+            #make selection based on mutation rate
+            mutate_selections = torch.rand_like(weights) < AI_Agent.MUTATION_RATE
+            
+            #mutate the weight by changing the it by the muatation percent
+            mutate_gen = torch.rand_like(weights) * AI_Agent.MUTATION_PERCENT
+            
+            #multiply the original value by the mutation gen
+            weights[mutate_selections] += mutate_gen[mutate_selections]
