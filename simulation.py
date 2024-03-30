@@ -1,6 +1,9 @@
 from pygame import *
 from random import *
 from math import cos, sin, pi
+from ai import *
+import numpy as np
+
 
 
 WIDTH, HEIGHT = 1280, 720
@@ -9,6 +12,16 @@ init()
 #Teams are red blue green yellow
 teamColours = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
 resourceList = ["Brick", "Lumber", "Ore", "Grain", "Wool"]
+
+
+def nthBest(arr, n):
+    # Get the indices that would sort the array in ascending order
+    sorted_indices = np.argsort(arr)
+    
+    # Access the index corresponding to the nth largest value
+    nth_largest_index = sorted_indices[-n]
+    
+    return nth_largest_index
 
 #One full Catan simulation from start until someone wins
 class Game:
@@ -21,10 +34,10 @@ class Game:
         self.show = show
         self.cards = ["Knight"]*14 + ["Road Building"]*2 + ["Year of Plenty"]*2 + ["Monopoly"]*2 + ["Victory Point"]*5
         shuffle(self.cards)
-        print(self.cards)
 
     def doTurn(self, display, screen):
-        roll = 7#self.players[self.turn].rollDice()
+        print("\n\n")
+        roll = self.players[self.turn].rollDice()
 
         if roll == 7:
             self.players[self.turn].moveRobber()
@@ -33,48 +46,70 @@ class Game:
 
         self.display(screen)
         display.flip()
-        print(roll)
-
-        #Proccess the user action
         
-        for i in range(10): #Maximum of 10 actions per turn
+
+
+        
+        
+        for i in range(500): #Maximum of 10 actions per turn
             action = self.players[self.turn].decideAction()
-            if action == "Build City":
-                self.players[self.turn].buildCity()
-
-            elif action == "Build Settlement":
-                self.players[self.turn].buildSettlement()
-
+            flag = False
+            if action == "Build Settlement":
+                if not self.players[self.turn].buildSettlement():
+                    self.players[self.turn].usedAction[0] = True
+                    flag = True
+            elif action == "Build City":
+                if not self.players[self.turn].buildCity():
+                    self.players[self.turn].usedAction[1] = True
+                    flag = True
             elif action == "Build Bridge":
-                self.players[self.turn].buildBridge()
-
+                if not self.players[self.turn].buildBridge():
+                    self.players[self.turn].usedAction[2] = True
+                    flag = True
             elif action == "Buy Development Card":
-                self.players[self.turn].buyDevelopmentCard()
-
+                if not self.players[self.turn].buyDevelopmentCard():
+                    self.players[self.turn].usedAction[3] = True
+                    flag = True
             elif action == "Trade":
-                self.players[self.turn].tradeRequest()
-
+                if not self.players[self.turn].tradeRequest():
+                    self.players[self.turn].usedAction[4] = True
+                    flag = True
             elif action == "Use Knight Card":
-                self.players[self.turn].useKnightCard()
-
+                if not self.players[self.turn].useKnightCard():
+                    self.players[self.turn].usedAction[5] = True
+                    flag = True
             elif action == "Use Road Building Card":
-                self.players[self.turn].useRoadBuildingCard()
-
-            elif action == "Use Year Of Plenty Card":
-                self.players[self.turn].useYearOfPlentyCard()
-
+                if not self.players[self.turn].useRoadBuildingCard():
+                    self.players[self.turn].usedAction[6] = True
+                    flag = True
+            elif action == "Use Year of Plenty Card":
+                a = self.players[self.turn].useYearOfPlentyCard()
+                print(a)
+                if not a:
+                    self.players[self.turn].usedAction[7] = True
+                    flag = True
             elif action == "Use Monopoly Card":
-                self.players[self.turn].useMonopolyCard()
-
+                if not self.players[self.turn].useMonopolyCard():
+                    self.players[self.turn].usedAction[8] = True
+                    flag = True
             elif action == "Use Victory Point Card":
-                self.players[self.turn].useVictoryPointCard()
-
-            else:
-                self.endTurn()
+                if not self.players[self.turn].useVictoryPointCard():
+                    self.players[self.turn].usedAction[9] = True
+                    flag = True
+            elif action == "End Turn":
                 break
+            else:
+                print(action)
+                print("Naming Error")
+            
+            if not flag:
+                print(action)
+                self.players[self.turn].usedAction = [False for i in range(11)] #Keeps track of which options dont work for the AI
+
             self.display(screen)
             display.flip()
             
+        self.endTurn()
         for player in self.players:
             if player.victory >= 10:
                 self.endGame(player)
@@ -119,7 +154,7 @@ class Game:
 
     def placeSettlement(self, team, location):
         #Check if empty and same colour bridge is connected, and no neighbouring settlements/cities at all
-        if self.board.vertices[location].settlement != None:
+        if self.board.vertices[location].settlement != None or self.board.vertices[location].city != None:
             print("Spot is already taken")
             return False
         for vertex in self.board.vertices[location].adjacentNodes:
@@ -162,6 +197,12 @@ class Game:
             return True
         for bridge in curBridge.v1.connectedBridges + curBridge.v2.connectedBridges:
             if bridge != curBridge and bridge.bridge == team:
+                sharedVertex = curBridge.v1
+                if curBridge.v2 in [bridge.v1, bridge.v2]:
+                    sharedVertex = curBridge.v2
+                if sharedVertex.settlement != None and sharedVertex.settlement != team or sharedVertex.city != None and sharedVertex.city != team:
+                    print("Can't build bridge through an enemy structure")
+                    print("False")
                 if not self.players[team].changeResources(-1, -1, 0, 0, 0):
                     print("Not enough resources for a bridge")
                     return False
@@ -340,7 +381,6 @@ class Hex:
         (self.x - Hex.radius * 3 ** 0.5 / 2, self.y + Hex.radius / 2),
         (self.x - Hex.radius * 3 ** 0.5 / 2, self.y - Hex.radius / 2)], 0)
         if self.hasRobber:
-            print(self.real, self.distance)
             draw.circle(screen, (0, 0, 0), (self.x, self.y), 15, 0)
 
     def setRobber(self, val):
@@ -356,7 +396,14 @@ class Player:
         self.game = game
         self.cards = []
         self.isAI = isAI
-        self.invalidOptions = [False for i in range(11)] #Keeps track of which options dont work for the AI
+
+        if self.isAI:
+            self.decideAction_NN = AI_Agent(11, None)
+            self.moveRobber_NN = AI_Agent(19, None)
+            self.vertexValue_NN = AI_Agent(54, None)
+            self.bridgeValue_NN = AI_Agent(72, None)
+            self.cardValue_NN = AI_Agent(10, None)
+        self.usedAction = [False for i in range(11)] #Keeps track of which options dont work for the AI
 
     def addVictory(self):
         self.victory += 1
@@ -386,8 +433,13 @@ class Player:
     def decideAction(self):
         actions = {1:"Build Settlement", 2:"Build City", 3:"Build Bridge", 4:"Buy Development Card", 5:"Trade", 6:"Use Knight Card", 7:"Use Road Building Card", 8:"Use Year of Plenty Card", 9:"Use Monopoly Card", 10:"Use Victory Point Card",  11:"End Turn"}
         if self.isAI:
-            pass
-    
+            outputs = self.decideAction_NN.forward(self.getInputInformation())
+            for i in range(1, 12):
+                cur = nthBest(outputs, i) 
+                if not self.usedAction[cur]:
+                    break
+
+            return actions[cur+1]
         else:
             for i in range(1, 12):
                 print(i, ":", actions[i])
@@ -404,7 +456,12 @@ class Player:
 
     def moveRobber(self):
         if self.isAI:
-            pass
+            outputs = self.moveRobber_NN.forward(self.getInputInformation())
+            for i in range(1, 20):
+                cur = nthBest(outputs, i)
+                if self.game.moveRobber(self.ID, cur):
+                    return True
+            return False
         else:
             inp = input("Enter the tile to move the robber to: ")
             try:
@@ -416,12 +473,12 @@ class Player:
 
     
     def buildCity(self):
-
-        
         if self.isAI:
-            #For node in output, see if we can build a city there
-            #If so, return true
-            #Else, try next city
+            outputs = self.vertexValue_NN.forward(self.getInputInformation())
+            for i in range(1, 55):
+                cur = nthBest(outputs, i)
+                if self.game.placeCity(self.ID, cur):
+                    return True
             return False
         else:
             inp = input("Enter where you would like to place the city: ")
@@ -433,8 +490,12 @@ class Player:
             
 
     def buildSettlement(self):
-
         if self.isAI:
+            outputs = self.vertexValue_NN.forward(self.getInputInformation())
+            for i in range(1, 55):
+                cur = nthBest(outputs, i)
+                if self.game.placeSettlement(self.ID, cur):
+                    return True
             return False
         else:
             inp = input("Enter where you would like to place the settlement: ")
@@ -446,8 +507,12 @@ class Player:
             
 
     def buildBridge(self):
-
         if self.isAI:
+            outputs = self.bridgeValue_NN.forward(self.getInputInformation())
+            for i in range(1, 73):
+                cur = nthBest(outputs, i)
+                if self.game.placeBridge(self.ID, self.game.board.vertices.index(self.game.board.bridges[cur].v1), self.game.board.vertices.index(self.game.board.bridges[cur].v2)):
+                    return True
             return False
         else:
             inp = input("Enter where you would like to place the bridge (For example: 1 2): ")
@@ -472,22 +537,34 @@ class Player:
 
     def tradeRequest(self):
         if self.isAI:
-            pass
+            return False
         else:
             pass
 
     def useKnightCard(self):
         if "Knight" in self.cards:
-            self.cards.remove("Knight")
-            return self.moveRobber()
+            if self.moveRobber():
+                self.cards.remove("Knight")
+                return True
+            return False
         print("No Knight card available")
         return False
 
     def useRoadBuildingCard(self):
+        if not "Road Building" in self.cards:
+            return False
+        self.cards.remove("Road Building")
         count = 0
         for i in range(50):
             if self.isAI:
-                return False
+                outputs = self.bridgeValue_NN.forward(self.getInputInformation())
+                for i in range(1, 73):
+                    cur = nthBest(outputs, i)
+                    if self.game.placeFreeBridge(self.ID, self.game.board.vertices.index(self.game.board.bridges[cur].v1), self.game.board.vertices.index(self.game.board.bridges[cur].v2)):
+                        count += 1
+                        break
+                else:
+                    return False
             else:
                 inp = input("Enter where you would like to place the bridge (For example: 1 2): ")
                 try:
@@ -496,7 +573,7 @@ class Player:
                     b = int(b)
                 except:
                     continue
-                if self.game.placeBridge(self.ID, a, b):
+                if self.game.placeFreeBridge(self.ID, a, b):
                     count += 1
             if count >= 2:
                 return True
@@ -504,10 +581,13 @@ class Player:
         
 
     def useYearOfPlentyCard(self):
+        if not "Year of Plenty" in self.cards:
+            return False
+        self.cards.remove("Year of Plenty")
         count = 0
-        for i in range(50):
+        while True:
             if self.isAI:
-                pass
+                inp = 1
             else:
                 print("1: Brick, 2: Lumber, 3: Ore, 4: Grain, 5: Wool")
                 inp = input("Enter what resource you would like: ")
@@ -526,6 +606,9 @@ class Player:
 
 
     def useMonopolyCard(self):
+        if not "Monopoly" in self.cards:
+            return False
+        self.cards.remove("Monopoly")
         if self.isAI:
             pass
         else:
@@ -540,7 +623,7 @@ class Player:
                     print("Invalid Input")
                     continue
                 break
-        res = resourcList[inp]
+        res = resourceList[inp]
         for player in self.game.players:
             if self != player:
                 self.resources[res] += player.resources[res]
@@ -555,6 +638,61 @@ class Player:
         self.addVictory()
         return True
 
+    #Convert player and board state into usable ai information
+    def getInputInformation(self):
+        values = []
+
+        for vertex in self.game.board.vertices:
+            if vertex.city == None and vertex.settlement == None:
+                values.append(0.5)
+            elif vertex.city == None:
+                if vertex.settlement == self.ID:
+                    values.append(0.75)
+                else:
+                    values.append(0.25)
+            else:
+                if vertex.city == self.ID:
+                    values.append(1)
+                else:
+                    values.append(0)
+                
+        for bridge in self.game.board.bridges:
+            if bridge.bridge == None:
+                values.append(0.5)
+            elif bridge.bridge == self.ID:
+                values.append(1)
+            else:
+                values.append(0)
+
+        for resource in resourceList:
+            values.append(1 - 1/(self.resources[resource]+1))
+
+        knightCards = 0
+        roadCards = 0
+        yearOfPlentyCards = 0
+        monopolyCards = 0
+        victoryPointCards = 0
+
+        for card in self.cards:
+            if card == "Knight":
+                knightCards += 1
+            elif card == "Road Building":
+                roadCards += 1
+            elif card == "Year of Plenty":
+                yearOfPlentyCards += 1
+            elif card == "Monopoly":
+                monopolyCards += 1
+            elif card == "Victory Point":
+                victoryPointCards += 1
+
+        values.append(1 - 1/(knightCards+1))
+        values.append(1 - 1/(roadCards+1))
+        values.append(1 - 1/(yearOfPlentyCards+1))
+        values.append(1 - 1/(monopolyCards+1))
+        values.append(1 - 1/(victoryPointCards+1))
+
+        return values
+
 
 """
 Turn:
@@ -565,17 +703,6 @@ buy development card
 play development cards (cant be one you just bought cept for victory cards)
 """
 
-class DevelopmentCard:
-    def __init__(self, card):
-        pass
-
-    def useCard(self, player):
-        if card == "Knight":
-            pass
-        elif card == "Monopoly":
-            pass
-        elif card == "Library":
-            player.addVictory()
 
 class Vertex:
     
