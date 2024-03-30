@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import os
 import random as rnd
 from scipy import special
 
@@ -29,16 +29,16 @@ class AI_Agent(nn.Module):
             
         # Output layer corresponds to speed and angular velocity
         self.layers.append(nn.Linear(AI_Agent.NUM_HIDDEN_LAYER_NEURONS, outputLength, bias=False)) 
-        #Number of output nodes should be x, 200 is placeholder
+       
+        
+        for layer in self.layers:
+            # Roughly using xavier initialization
+            # This helps prevent exploding or vanishing gradients
+            nn.init.uniform_(layer.weight, -0.3, 0.3)
 
-        if dataTxt == None:
-            for layer in self.layers:
-                nn.init.uniform_(layer.weight, -0.4, 0.4)  # Initialize weights between -1 and 1
-                #Gives each weight a starting value between 0.2 and 0.8
-                #This helps prevent exploding or vanishing gradients
-        else:
-            #Get dataTxt to write the connection data
-            pass
+        if dataTxt != None:
+            self.readWeights(dataTxt)
+               
 
         self.eval() #stops the training
 
@@ -56,7 +56,7 @@ class AI_Agent(nn.Module):
         return special.expit(x).tolist()
     
     #generate values random values to give to each bridge
-    def mutation(self):
+    def mutate(self):
         #iterate through each layer in the network
         for layer in self.layers:
             
@@ -68,3 +68,44 @@ class AI_Agent(nn.Module):
             
             #multiply the original value by the mutation gen
             layer.weight.data[mutate_selections] += mutate_gen[mutate_selections]
+
+    # This function will take a file of weights, and write this neural networks weights to the file
+    def writeWeights(self, filename):
+        """takes itself, and a txt file to output to"""
+        file = open(filename, "w")
+        
+        for index, layer in enumerate(self.layers):
+            weights = layer.weight.data.tolist()
+            file.write(f"Layer {index}\n")
+            file.write("Weights:")
+            file.write(', '.join(str(w) for w in weights)+'\n')
+            file.write('\n')
+
+        file.close()
+
+    # This function will take a file of weights, and write that file to the neural network
+    def readWeights(self, filename):
+        """load weights from a text file into agent's neural net"""
+        if os.path.exists(filename):
+            lines = open(filename, 'r').readlines()
+            index = -1
+            for line in  lines:
+                if line.startswith("Layer"):
+                    index += 1
+                elif line.startswith("Weights"):
+                    weights_txt = line.split(":")[-1].strip().replace("[", "").replace("]", "")
+                    weights = list(map(float, weights_txt.split(',')))
+
+                    # Determine the dimensions of the weight matrix
+                    num_neurons_in_current_layer = self.layers[index].weight.data.size(0)
+                    num_neurons_in_next_layer = self.layers[index].weight.data.size(1)
+
+                    # Reshape the flat list of weights into a two-dimensional tensor
+                    weights_tensor = torch.FloatTensor(weights).view(num_neurons_in_current_layer, num_neurons_in_next_layer)
+
+                    # Assign the reshaped weights to the weight.data attribute of the current layer
+                    self.layers[index].weight.data = weights_tensor
+        else:
+            pass
+
+    

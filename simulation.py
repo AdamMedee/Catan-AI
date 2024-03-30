@@ -12,7 +12,11 @@ init()
 #Teams are red blue green yellow
 teamColours = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
 resourceList = ["Brick", "Lumber", "Ore", "Grain", "Wool"]
+printing_enabled = False
 
+def custom_print(*args, **kwargs):
+    if printing_enabled:
+        print(*args, **kwargs) 
 
 def nthBest(arr, n):
     # Get the indices that would sort the array in ascending order
@@ -25,18 +29,20 @@ def nthBest(arr, n):
 
 #One full Catan simulation from start until someone wins
 class Game:
-    def __init__(self, p0, p1, p2, p3, show):
+    def __init__(self, p0, p1, p2, p3, show, ai_id):
         #pn True is AI, False is human player
         #The ID is which team you are on (team 0, 1, 2, 3)
         self.board = Board()
-        self.players = [Player(0, p0, self), Player(1, p1, self), Player(2, p2, self), Player(3, p3, self)]
+        self.players = [Player(0, p0, self, ai_id*4), Player(1, p1, self, ai_id*4+1), Player(2, p2, self, ai_id*4+2), Player(3, p3, self, ai_id*4+3)]
         self.turn = 0
+        self.totalTurns = 0
         self.show = show
+        self.gameOver = False
         self.cards = ["Knight"]*14 + ["Road Building"]*2 + ["Year of Plenty"]*2 + ["Monopoly"]*2 + ["Victory Point"]*5
         shuffle(self.cards)
 
     def doTurn(self, display, screen):
-        print("\n\n")
+        custom_print("\n\n")
         roll = self.players[self.turn].rollDice()
 
         if roll == 7:
@@ -44,8 +50,9 @@ class Game:
         else:
             self.resourceProduction(roll)
 
-        self.display(screen)
-        display.flip()
+        if self.show:
+            self.display(screen)
+            display.flip()
         
 
 
@@ -58,10 +65,14 @@ class Game:
                 if not self.players[self.turn].buildSettlement():
                     self.players[self.turn].usedAction[0] = True
                     flag = True
+                else:
+                    self.players[self.turn].addVictory()
             elif action == "Build City":
                 if not self.players[self.turn].buildCity():
                     self.players[self.turn].usedAction[1] = True
                     flag = True
+                else:
+                    self.players[self.turn].addVictory()
             elif action == "Build Bridge":
                 if not self.players[self.turn].buildBridge():
                     self.players[self.turn].usedAction[2] = True
@@ -83,9 +94,7 @@ class Game:
                     self.players[self.turn].usedAction[6] = True
                     flag = True
             elif action == "Use Year of Plenty Card":
-                a = self.players[self.turn].useYearOfPlentyCard()
-                print(a)
-                if not a:
+                if not self.players[self.turn].useYearOfPlentyCard():
                     self.players[self.turn].usedAction[7] = True
                     flag = True
             elif action == "Use Monopoly Card":
@@ -99,23 +108,53 @@ class Game:
             elif action == "End Turn":
                 break
             else:
-                print(action)
-                print("Naming Error")
+                custom_print(action)
+                custom_print("Naming Error")
             
             if not flag:
-                print(action)
+                custom_print(action)
                 self.players[self.turn].usedAction = [False for i in range(11)] #Keeps track of which options dont work for the AI
 
-            self.display(screen)
-            display.flip()
-            
-        self.endTurn()
-        for player in self.players:
-            if player.victory >= 10:
-                self.endGame(player)
+            if self.show:
+                self.display(screen)
+                display.flip()
 
+        self.players[self.turn].usedAction = [False for i in range(11)]
+        self.players[self.turn].usedCard = False
+        self.endTurn()
+
+        knightCounts = []
+        
+        for player in self.players:
+            player.largestArmy = False
+            knightCounts.append(player.knightsUsed)
+            
+        if max(knightCounts) >= 3 and knightCounts.count(max(knightCounts)) == 1:
+            self.players[knightCounts.index(max(knightCounts))].largestArmy = True
+
+        pathLengths = []
+
+        for player in self.players:
+            player.longestPath = False
+            pathLengths.append(player.getLongestPath())
+            
+        if max(pathLengths) >= 3 and pathLengths.count(max(pathLengths)) == 1:
+            self.players[pathLengths.index(max(pathLengths))].longestPath = True
+            
+        for player in self.players:
+            bonus = 0
+            if player.largestArmy:
+                bonus += 2
+            if player.longestPath:
+                bonus += 2
+            if player.victory + bonus >= 10:
+                self.endGame(self.players.index(player))
+            custom_print(bonus, player.victory)
+            custom_print()
+            
     def endTurn(self):
         self.turn = (self.turn+1)%4
+        self.totalTurns += 1
 
     def resourceProduction(self, rollValue):
         for tile in self.board.tiles:
@@ -134,32 +173,35 @@ class Game:
                     self.players[loc].changeResources(resources["Brick"], resources["Lumber"], resources["Ore"], resources["Grain"], resources["Wool"])
 
     def endGame(self, winner):
+        custom_print("We have a winner!")
         if winner == -1:
-            print("Invalid winner")
+            custom_print("Invalid winner")
         else:
-            print(winner)
+            custom_print(winner)
+        custom_print(self.totalTurns)
+        self.gameOver = True
         del self
 
     def placeCity(self, team, location):
         #Check if settlement of same colour is there
         if self.board.vertices[location].settlement == team:
             if not self.players[team].changeResources(0, 0, -3, -2, 0):
-                print("Not enough resources for a city")
+                custom_print("Not enough resources for a city")
                 return False
             self.board.vertices[location].placeCity(team)
-            print("City has been built")
+            custom_print("City has been built")
             return True
-        print("Invalid Location")
+        custom_print("Invalid Location")
         return False
 
     def placeSettlement(self, team, location):
         #Check if empty and same colour bridge is connected, and no neighbouring settlements/cities at all
         if self.board.vertices[location].settlement != None or self.board.vertices[location].city != None:
-            print("Spot is already taken")
+            custom_print("Spot is already taken")
             return False
         for vertex in self.board.vertices[location].adjacentNodes:
             if vertex.settlement != None or vertex.city != None:
-                print("Too close to a neighbouring building")
+                custom_print("Too close to a neighbouring building")
                 return False
         flag = False
         for bridge in self.board.bridges:
@@ -167,10 +209,10 @@ class Game:
                 if bridge.bridge == team:
                     flag = True
         if not flag:
-            print("No nearby bridge")
+            custom_print("No nearby bridge")
             return False
         if not self.players[team].changeResources(-1, -1, 0, -1, -1):
-            print("Not enough resources for a settlement")
+            custom_print("Not enough resources for a settlement")
             return False
         self.board.vertices[location].placeSettlement(team)
         return True
@@ -183,16 +225,16 @@ class Game:
             if self.board.vertices[location2] in [bridge.v1, bridge.v2]:
                 curBridge = bridge
         if curBridge == None:
-            print("That bridge does not exist")
+            custom_print("That bridge does not exist")
             return False
         if curBridge.bridge != None:
-            print("A bridge already exists there")
+            custom_print("A bridge already exists there")
             return False
         if curBridge.v1.city == team or curBridge.v2.city == team or curBridge.v1.settlement == team or curBridge.v2.settlement == team:
             if not self.players[team].changeResources(-1, -1, 0, 0, 0):
-                print("Not enough resources for a bridge")
+                custom_print("Not enough resources for a bridge")
                 return False
-            print("Bridge has been built")
+            custom_print("Bridge has been built")
             curBridge.bridge = team
             return True
         for bridge in curBridge.v1.connectedBridges + curBridge.v2.connectedBridges:
@@ -201,15 +243,15 @@ class Game:
                 if curBridge.v2 in [bridge.v1, bridge.v2]:
                     sharedVertex = curBridge.v2
                 if sharedVertex.settlement != None and sharedVertex.settlement != team or sharedVertex.city != None and sharedVertex.city != team:
-                    print("Can't build bridge through an enemy structure")
-                    print("False")
-                if not self.players[team].changeResources(-1, -1, 0, 0, 0):
-                    print("Not enough resources for a bridge")
+                    custom_print("Can't build bridge through an enemy structure")
                     return False
-                print("Bridge has been built")
+                if not self.players[team].changeResources(-1, -1, 0, 0, 0):
+                    custom_print("Not enough resources for a bridge")
+                    return False
+                custom_print("Bridge has been built")
                 curBridge.bridge = team
                 return True
-        print("Can't build a bridge there")
+        custom_print("Can't build a bridge there")
         return False
 
     def placeFreeBridge(self, team, location1, location2):
@@ -218,21 +260,21 @@ class Game:
             if self.board.vertices[location2] in [bridge.v1, bridge.v2]:
                 curBridge = bridge
         if curBridge == None:
-            print("That bridge does not exist")
+            custom_print("That bridge does not exist")
             return False
         if curBridge.bridge != None:
-            print("A bridge already exists there")
+            custom_print("A bridge already exists there")
             return False
         if curBridge.v1.city == team or curBridge.v2.city == team or curBridge.v1.settlement == team or curBridge.v2.settlement == team:
-            print("Bridge has been built")
+            custom_print("Bridge has been built")
             curBridge.bridge = team
             return True
         for bridge in curBridge.v1.connectedBridges + curBridge.v2.connectedBridges:
             if bridge != curBridge and bridge.bridge == team:
-                print("Bridge has been built")
+                custom_print("Bridge has been built")
                 curBridge.bridge = team
                 return True
-        print("Can't build a bridge there")
+        custom_print("Can't build a bridge there")
         return False
 
     def moveRobber(self, team, location):
@@ -283,7 +325,7 @@ class Board:
         self.vertices[32].settlement = 0
         self.vertices[22].settlement = 0
         self.vertices[18].settlement = 1
-        self.vertices[8].city = 1
+        self.vertices[8].settlement = 1
         self.vertices[10].settlement = 2
         self.vertices[24].settlement = 2
         self.vertices[39].settlement = 3
@@ -389,26 +431,28 @@ class Hex:
 
 
 class Player:
-    def __init__(self, ID, isAI, game):
-        self.resources = {"Brick":4, "Lumber":4, "Ore":4, "Grain":4, "Wool":4}
-        self.victory = 0
+    def __init__(self, ID, isAI, game, ai_id):
+        self.resources = {"Brick":1, "Lumber":1, "Ore":1, "Grain":1, "Wool":1}
+        self.victory = 2
+        self.knightsUsed = 0
+        self.largestArmy = False
+        self.longestPath = False
         self.ID = ID
         self.game = game
         self.cards = []
         self.isAI = isAI
+        self.cardUsed = False
 
         if self.isAI:
-            self.decideAction_NN = AI_Agent(11, None)
-            self.moveRobber_NN = AI_Agent(19, None)
-            self.vertexValue_NN = AI_Agent(54, None)
-            self.bridgeValue_NN = AI_Agent(72, None)
-            self.cardValue_NN = AI_Agent(10, None)
+            self.decideAction_NN = AI_Agent(11, "CurrentGeneration/DecisionWeights/" + str(ai_id) + ".txt") #11 options
+            self.moveRobber_NN = AI_Agent(19, "CurrentGeneration/RobberPlacementWeights/" + str(ai_id) + ".txt") #19 hexes
+            self.vertexValue_NN = AI_Agent(54, "CurrentGeneration/VertexValuationWeights/" + str(ai_id) + ".txt") #54 vertices
+            self.bridgeValue_NN = AI_Agent(72, "CurrentGeneration/BridgeValuationWeights/" + str(ai_id) + ".txt") #72 bridge spots
+            self.cardValue_NN = AI_Agent(10, "CurrentGeneration/CardValuationWeights/" + str(ai_id) + ".txt") #10 cards
         self.usedAction = [False for i in range(11)] #Keeps track of which options dont work for the AI
 
     def addVictory(self):
         self.victory += 1
-        if self.victory >= 10:
-            self.game.endGame(self.ID)
 
     def rollDice(self):
         dice1 = randint(1, 6)
@@ -442,7 +486,7 @@ class Player:
             return actions[cur+1]
         else:
             for i in range(1, 12):
-                print(i, ":", actions[i])
+                custom_print(i, ":", actions[i])
             while True:
                 try:
                     inp = int(input("Enter the action you would like to take: "))
@@ -526,10 +570,10 @@ class Player:
 
     def buyDevelopmentCard(self):
         if len(self.game.cards) == 0:
-            print("There are no more cards to buy")
+            custom_print("There are no more cards to buy")
             return False
         if not self.changeResources(0, 0, -1, -1, -1):
-            print("Can't afford a card")
+            custom_print("Can't afford a card")
             return False
         self.cards.append(self.game.cards.pop())
         return True
@@ -542,18 +586,25 @@ class Player:
             pass
 
     def useKnightCard(self):
+        if self.cardUsed:
+            return False
         if "Knight" in self.cards:
             if self.moveRobber():
                 self.cards.remove("Knight")
+                self.knightsUsed += 1
+                self.cardUsed = True
                 return True
             return False
-        print("No Knight card available")
+        custom_print("No Knight card available")
         return False
 
     def useRoadBuildingCard(self):
+        if self.cardUsed:
+            return False
         if not "Road Building" in self.cards:
             return False
         self.cards.remove("Road Building")
+        self.cardUsed = True
         count = 0
         for i in range(50):
             if self.isAI:
@@ -581,22 +632,27 @@ class Player:
         
 
     def useYearOfPlentyCard(self):
+        if self.cardUsed:
+            return False
         if not "Year of Plenty" in self.cards:
             return False
         self.cards.remove("Year of Plenty")
+        self.cardUsed = True
         count = 0
         while True:
             if self.isAI:
-                inp = 1
+                outputs = self.cardValue_NN.forward(self.getInputInformation())[0:5]
+                inp = nthBest(outputs, 1)
+                
             else:
-                print("1: Brick, 2: Lumber, 3: Ore, 4: Grain, 5: Wool")
+                custom_print("1: Brick, 2: Lumber, 3: Ore, 4: Grain, 5: Wool")
                 inp = input("Enter what resource you would like: ")
                 try:
                     inp = int(inp)-1
                     if not 0 <= inp <= 4:
                         raise
                 except:
-                    print("Invalid Input")
+                    custom_print("Invalid Input")
                     continue
             self.resources[resourceList[inp]] += 1
             count += 1
@@ -606,21 +662,25 @@ class Player:
 
 
     def useMonopolyCard(self):
+        if self.cardUsed:
+            return False
         if not "Monopoly" in self.cards:
             return False
         self.cards.remove("Monopoly")
+        self.cardUsed = True
         if self.isAI:
-            pass
+            outputs = self.cardValue_NN.forward(self.getInputInformation())[0:5]
+            inp = nthBest(outputs, 1)
         else:
             while True:
-                print("1: Brick, 2: Lumber, 3: Ore, 4: Grain, 5: Wool")
+                custom_print("1: Brick, 2: Lumber, 3: Ore, 4: Grain, 5: Wool")
                 inp = input("Enter what resource you would like: ")
                 try:
                     inp = int(inp)-1
                     if not 0 <= inp <= 4:
                         raise
                 except:
-                    print("Invalid Input")
+                    custom_print("Invalid Input")
                     continue
                 break
         res = resourceList[inp]
@@ -631,12 +691,18 @@ class Player:
         return True
 
     def useVictoryPointCard(self):
+        if self.cardUsed:
+            return False
         if "Victory Point" in self.cards:
             self.cards.remove("Victory Point")
+            self.cardUsed = True
         else:
             return False
         self.addVictory()
         return True
+
+    def getLongestPath(self):
+        return 1
 
     #Convert player and board state into usable ai information
     def getInputInformation(self):
@@ -693,15 +759,6 @@ class Player:
 
         return values
 
-
-"""
-Turn:
-roll dice and get production
-built settlements
-build cities
-buy development card
-play development cards (cant be one you just bought cept for victory cards)
-"""
 
 
 class Vertex:

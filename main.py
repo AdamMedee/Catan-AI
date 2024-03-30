@@ -6,7 +6,7 @@ from simulation import *
 def main():
     running = True
 
-    g = Game(False, True, False, False, True)
+    g = Game(True, True, True, True, True, 3)
 
     screen = display.set_mode((WIDTH, HEIGHT))
     screen.fill((100, 100, 200))
@@ -19,9 +19,10 @@ def main():
 
         
         screen.fill((100, 100, 200))
-
+        
         g.doTurn(display, screen)
-
+        if g.gameOver:
+            running = False
         g.display(screen)
 
         display.flip()
@@ -29,7 +30,7 @@ def main():
 
 main()
 
-quit()
+#quit()
                 
 
 
