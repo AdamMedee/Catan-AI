@@ -1,42 +1,14 @@
 from pygame import *
 from random import *
 from math import cos, sin, pi
-"""
-Classes:
-game (includes board state and the player states, current turn, who is AI and who isn't, delay for the AI turns)
 
-board (includes the hex layout and all the things on the board)
-
-hex (simple coloured hex with a number on it)
-
-player (has their own funcs but can be AI or in person controlled)
-
-cards
-
-bridge, cities, and settlements
-
-dice
-
-
-Turn:
-roll dice and get production
-built settlements
-build cities
-buy development card
-play development cards (cant be one you just bought cept for victory cards)
-
-if you rolled a 7, do robber stuff
-
-
-Check if you won
-"""
 
 WIDTH, HEIGHT = 1280, 720
 
 init()
 #Teams are red blue green yellow
 teamColours = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
-
+resourceList = ["Brick", "Lumber", "Ore", "Grain", "Wool"]
 
 #One full Catan simulation from start until someone wins
 class Game:
@@ -193,6 +165,29 @@ class Game:
                 if not self.players[team].changeResources(-1, -1, 0, 0, 0):
                     print("Not enough resources for a bridge")
                     return False
+                print("Bridge has been built")
+                curBridge.bridge = team
+                return True
+        print("Can't build a bridge there")
+        return False
+
+    def placeFreeBridge(self, team, location1, location2):
+        curBridge = None
+        for bridge in self.board.vertices[location1].connectedBridges:
+            if self.board.vertices[location2] in [bridge.v1, bridge.v2]:
+                curBridge = bridge
+        if curBridge == None:
+            print("That bridge does not exist")
+            return False
+        if curBridge.bridge != None:
+            print("A bridge already exists there")
+            return False
+        if curBridge.v1.city == team or curBridge.v2.city == team or curBridge.v1.settlement == team or curBridge.v2.settlement == team:
+            print("Bridge has been built")
+            curBridge.bridge = team
+            return True
+        for bridge in curBridge.v1.connectedBridges + curBridge.v2.connectedBridges:
+            if bridge != curBridge and bridge.bridge == team:
                 print("Bridge has been built")
                 curBridge.bridge = team
                 return True
@@ -468,7 +463,7 @@ class Player:
         if len(self.game.cards) == 0:
             print("There are no more cards to buy")
             return False
-        if not changeResources(0, 0, -1, -1, -1):
+        if not self.changeResources(0, 0, -1, -1, -1):
             print("Can't afford a card")
             return False
         self.cards.append(self.game.cards.pop())
@@ -482,28 +477,75 @@ class Player:
             pass
 
     def useKnightCard(self):
-        if self.isAI:
-            pass
-        else:
-            pass
+        if "Knight" in self.cards:
+            self.cards.remove("Knight")
+            return self.moveRobber()
+        print("No Knight card available")
+        return False
 
     def useRoadBuildingCard(self):
-        if self.isAI:
-            pass
-        else:
-            pass
+        count = 0
+        for i in range(50):
+            if self.isAI:
+                return False
+            else:
+                inp = input("Enter where you would like to place the bridge (For example: 1 2): ")
+                try:
+                    a, b = inp.split(" ")
+                    a = int(a)
+                    b = int(b)
+                except:
+                    continue
+                if self.game.placeBridge(self.ID, a, b):
+                    count += 1
+            if count >= 2:
+                return True
+        return False
+        
 
     def useYearOfPlentyCard(self):
-        if self.isAI:
-            pass
-        else:
-            pass
+        count = 0
+        for i in range(50):
+            if self.isAI:
+                pass
+            else:
+                print("1: Brick, 2: Lumber, 3: Ore, 4: Grain, 5: Wool")
+                inp = input("Enter what resource you would like: ")
+                try:
+                    inp = int(inp)-1
+                    if not 0 <= inp <= 4:
+                        raise
+                except:
+                    print("Invalid Input")
+                    continue
+            self.resources[resourceList[inp]] += 1
+            count += 1
+            if count >= 2:
+                break
+        return True
+
 
     def useMonopolyCard(self):
         if self.isAI:
             pass
         else:
-            pass
+            while True:
+                print("1: Brick, 2: Lumber, 3: Ore, 4: Grain, 5: Wool")
+                inp = input("Enter what resource you would like: ")
+                try:
+                    inp = int(inp)-1
+                    if not 0 <= inp <= 4:
+                        raise
+                except:
+                    print("Invalid Input")
+                    continue
+                break
+        res = resourcList[inp]
+        for player in self.game.players:
+            if self != player:
+                self.resources[res] += player.resources[res]
+                player.resources[res] = 0
+        return True
 
     def useVictoryPointCard(self):
         if "Victory Point" in self.cards:
