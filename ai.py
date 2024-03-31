@@ -12,7 +12,7 @@ class AI_Agent(nn.Module):
     NUM_OUTPUT_LAYER_NEURONS = 10 #default
     
     MUTATION_RATE = 0.1 #probability that a parameter will be mutated in
-    MUTATION_PERCENT = 0.1 #10% chance to mutate a gene in each generation
+    MUTATION_PERCENT = 0.04 #10% chance to mutate a gene in each generation
     
     def __init__(self, outputLength, dataTxt):
         super().__init__() #creates an instance
