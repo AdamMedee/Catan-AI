@@ -79,7 +79,7 @@ def train(n):
             curIndex += 1
 
 
-train(90)
+train(900)
 
 #quit()
                 
